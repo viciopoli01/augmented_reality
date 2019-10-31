@@ -1,0 +1,10 @@
+<launch>
+
+  <arg name="robot_name" default="cristina"/>
+  <arg name="map_file" default="hub"/>
+  <node pkg="augmented_reality" type="ar.py" name="augmented_reality" output="screen" args="$(arg robot_name) $(arg map_file)">
+    <param name="robot_name" type="str" value="$(arg robot_name)" />
+    <param name="map_file" type="str" value="$(arg map_file)" />
+  </node>
+
+</launch>
