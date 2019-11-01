@@ -45,33 +45,43 @@ class Augmenter():
 
     def process_image(self,image):
         """This function return the undirstorted image"""
+        height, width, _ = image.shape
+        border_values = np.zeros(np.shape(image))
+        mapx = np.ndarray(shape=(height, width, 1), dtype='float32')
+        mapy = np.ndarray(shape=(height, width, 1), dtype='float32')
+
         # Get the camera matrix from intrinsic calibration
-        camera_matrix=np.matrix(self.intrinsic.get('camera_matrix')['data'])
-        
-        camera_matrix.resize((self.intrinsic.get('camera_matrix')['rows'],self.intrinsic.get('camera_matrix')['cols']))
+        camera_matrix=np.matrix(self.intrinsic.get('camera_matrix')['data']).reshape(3,3)
 
         # Get the distortion coefficients
-        dist = np.array(self.intrinsic.get('distortion_coefficients')['data'])
+        dist = np.array(self.intrinsic.get('distortion_coefficients')['data']).reshape(1,5)
 
-        # Undistort the image
-        dst = cv2.undistort(image, camera_matrix, dist, None, camera_matrix)
-        return dst
+        # Get the distortion coefficients
+        rectification_matrix = np.matrix(self.intrinsic.get('rectification_matrix')['data']).reshape(3,3)
+
+        # Get the distortion coefficients
+        projection_matrix = np.matrix(self.intrinsic.get('projection_matrix')['data']).reshape(3,4)
+
+        mapx, mapy = cv2.initUndistortRectifyMap(camera_matrix,
+                                                 dist,
+                                                 rectification_matrix,
+                                                 projection_matrix,
+                                                 (width, height),
+                                                 cv2.CV_32FC1,
+                                                 mapx,
+                                                 mapy)
+        image_rectified = cv2.remap(image, mapx, mapy, cv2.INTER_CUBIC, border_values)
+        return image_rectified
 
     def ground2pixel(self, point):
         """This function trasform the ground real world points to pixel coordinate"""
         # add the 3rd element
-        if len(point)==3:
-            point[2]=1
-        else:   
-            point = np.append(point, 1)
-
-        #get the inverse of homografy matrix
-        homo = np.linalg.inv(self.homografy_matrix)
-        
-        # transform the point to camera coordinate
-        tras_point=np.dot(homo,np.reshape(point,(len(point),1)))
-        pixel=[tras_point[0]/tras_point[2],tras_point[1]/tras_point[2]]
-        return pixel
+        point = np.asarray(point)
+        point[2]=1
+        new_point=np.linalg.solve(self.homografy_matrix,point)
+        pixel = new_point[0:2]/new_point[2]
+        pixel = np.round(pixel, decimals=0)
+        return pixel.astype(int)
 
     def draw_segment(self, image, pt_x, pt_y, color):
         defined_colors = {
